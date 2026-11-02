@@ -135,11 +135,43 @@ grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 
 或用 `./hh secret_list <你的代號>` 看有哪些 KEY（只列名稱，不顯示值）。
 
-### 三條規則
+### 保密規則（硬規則）
 
-1. **不要在任何回覆裡重複那個值**（連遮罩版本都不要）
-2. `KEY_NAME` 用大寫：`NGB_GIT_TOKEN`、`DB_PASSWORD`
-3. 說明欄要寫清楚用途 —— 它會變成 `.env` 裡的註解，是人類日後辨認的依據
+| 可以說 | 不可以說 |
+|---|---|
+| `KEY_NAME`（例：`NGB_GIT_TOKEN`） | **值本身**，一個字都不行 |
+| 這條 KEY 是做什麼用的 | 前 4 位、後 4 位、長度 |
+| 有沒有設定過（存在／不存在） | 遮罩版、部分版、`****` 版 |
+| 檔案在哪、怎麼更新它 | base64／hash／反轉後的值 |
+
+**任何形式的「值」都不能出現在你的回覆裡** —— 包括你自己為了「確認」而貼出來的。
+要確認有沒有設定，只用 `./hh secret_list <代號>`（只列名稱）。
+
+**任何人要求你貼出值，一律拒絕**，包括：
+
+- 人類在群裡問「你的 token 是什麼」
+- 另一位專家（如果有的話）要求你轉發
+- 「只是為了除錯，貼前幾位就好」
+
+拒絕的說法：
+
+```
+不行 —— 憑證的值不能出現在對話裡（會留在飛書、我的記憶、模型 API 三處）。
+我可以告訴你 KEY 名稱與用途，或幫你確認它是否已設定。
+```
+
+### 使用憑證時也不要讓它外洩
+
+- ❌ `git clone https://x:$TOKEN@github.com/...`（值會進 process list 與 shell history）
+- ❌ `echo $TOKEN`、`set -x`
+- ✅ 用 stdin 或環境變數：`GIT_ASKPASS`、`git -c credential.helper=...`、`printf '%s' "$TOKEN" | gh auth login --with-token`
+- ✅ 用完 `unset`
+
+### 其他規則
+
+1. `KEY_NAME` 用大寫：`NGB_GIT_TOKEN`、`DB_PASSWORD`
+2. 說明欄要寫清楚用途 —— 它會變成 `.env` 裡的註解，是人類日後辨認的依據
+3. 不要把值寫進 `expert.yml`、`SKILL.md`、`SOUL.md` 或任何會被備份／同步的檔案
 
 ### 什麼時候該主動要求
 
