@@ -15,3 +15,4 @@ data/
 # ── 系統檔 ────────────────────────────────────────
 .DS_Store
 Thumbs.db
+private/groups.yaml

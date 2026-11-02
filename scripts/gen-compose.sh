@@ -11,6 +11,7 @@ mkdir -p "$EXPERTS"
 # bind-mount 的來源檔若不存在，docker 會自動建成「目錄」，容器內就變成讀不到檔案。
 # 所以先確保這兩個檔案存在。
 [ -f "$PEERS" ] || printf '# 尚無專家\n' > "$PEERS"
+[ -f "$GROUPS" ] || printf '# 尚未生成（roster 服務啟動後會寫入）\n' > "$GROUPS"
 
 python3 - "$EXPERTS" "$GEN_COMPOSE" "$ROOT" <<'PY'
 import os, sys
@@ -47,6 +48,7 @@ for entry in sorted(os.listdir(experts_dir)):
             f"{name}-data:/opt/data",
             # 直接掛同一個檔案：宿主重寫 → 容器即時看到，不需要重啟或 refresh
             "./private/peers.yaml:/opt/data/peers.yaml",
+            "./private/groups.yaml:/opt/data/groups.yaml:ro",
             "./scripts/seed-agent.sh:/etc/cont-init.d/99-seed-agent:ro",
             "./knowledge:/opt/bootstrap/knowledge:ro",
             f"./private/experts/{name}:/opt/bootstrap/expert",
@@ -63,6 +65,22 @@ for entry in sorted(os.listdir(experts_dir)):
     }
     # volume 用獨立前綴，避免與舊部署（hermes_helper）的 volume 撞名而被「收養」
     volumes[f"{name}-data"] = {"name": f"hermes-expert-{name}-data"}
+
+# roster：唯一需要「知道所有專家憑證」的服務，只讀 private/experts、只寫 groups.yaml
+services["roster"] = {
+    "build": {"context": "."},
+    "image": "hermes-experts:local",
+    "container_name": "hermes-roster",
+    "restart": "unless-stopped",
+    "entrypoint": ["/bin/sh", "/scripts/groups-watch.sh"],
+    "volumes": [
+        "./scripts:/scripts:ro",
+        "./private/experts:/src:ro",
+        "./private/groups.yaml:/out/groups.yaml",
+    ],
+    "networks": ["experts"],
+    "environment": {"GROUPS_REFRESH_SECONDS": "60"},
+}
 
 doc = {
     "services": services,
