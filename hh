@@ -8,7 +8,7 @@
 #   ./hh refresh     套用技能更新（名冊已即時同步，不需這步）
 #   ./hh doctor      體檢
 #   ./hh logs <n>    看日誌
-#   ./hh secret <n> <變數名>
+#   ./hh secret <n> "<說明>" <KEY_NAME> [值]
 #   ./hh approve <n> [配對碼]
 #   ./hh start|stop|restart <n> | restart-all
 #   ./hh rm <n>      移除專家（保留記憶）
@@ -100,26 +100,56 @@ cmd_approve() {
 }
 
 cmd_secret() {
-  local name="${1:-}" var="${2:-}"
-  [ -n "$name" ] && [ -n "$var" ] || { bad "用法：./hh secret <專家> <變數名>（例：./hh secret mpf DB_PASSWORD）"; return 1; }
+  # 用法：./hh secret <專家> <說明> <KEY_NAME> <KEY>
+  #   例：./hh secret developer "NGB 專案的 Git Token" NGB_GIT_TOKEN ghp_xxxxx
+  # 省略 KEY 時會以隱藏輸入方式詢問（適合不想讓值出現在 shell history 的情況）
+  local name="${1:-}" desc="${2:-}" key="${3:-}" val="${4:-}"
+  if [ -z "$name" ] || [ -z "$desc" ] || [ -z "$key" ]; then
+    bad '用法：./hh secret <專家> "<說明>" <KEY_NAME> [KEY]'
+    dim '  例：./hh secret developer "NGB 專案的 Git Token" NGB_GIT_TOKEN ghp_xxxxx'
+    dim '  省略 KEY 則以隱藏輸入詢問（不進 shell history）'
+    return 1
+  fi
   [ -f "$EXPERTS/$name/.env" ] || { bad "找不到 private/experts/$name/.env"; return 1; }
-  local val
-  read -rsp "輸入 $var 的值（不顯示）: " val; echo
-  [ -n "$val" ] || { bad "空值，取消"; return 1; }
-  SECRET_VAL="$val" python3 - "$EXPERTS/$name/.env" "$var" <<'PY'
+  [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || { bad "KEY_NAME 要大寫字母開頭，只含 A-Z 0-9 _（例：NGB_GIT_TOKEN）"; return 1; }
+
+  if [ -z "$val" ]; then
+    read -rsp "輸入 $key 的值（不顯示）: " val; echo
+    [ -n "$val" ] || { bad "空值，取消"; return 1; }
+  fi
+
+  SECRET_VAL="$val" SECRET_DESC="$desc" SECRET_KEY="$key" \
+    python3 - "$EXPERTS/$name/.env" <<'PY'
 import os, sys
-path, var = sys.argv[1], sys.argv[2]
+path = sys.argv[1]
+key = os.environ["SECRET_KEY"]
+desc = os.environ["SECRET_DESC"]
 val = os.environ["SECRET_VAL"]
-lines = [l for l in open(path, encoding="utf-8").read().splitlines() if not l.startswith(var + "=")]
-lines.append(f"{var}={val}")
-open(path, "w", encoding="utf-8").write("\n".join(lines) + "\n")
+
+lines = open(path, encoding="utf-8").read().splitlines()
+out, skip_next = [], False
+for line in lines:
+    if skip_next:            # 舊說明行
+        skip_next = False
+        continue
+    if line.strip() == f"# {desc}":
+        skip_next = True
+        continue
+    if line.startswith(key + "="):
+        continue
+    out.append(line)
+
+while out and not out[-1].strip():
+    out.pop()
+out.append(f"# {desc}")
+out.append(f"{key}={val}")
+open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
 PY
-  unset val SECRET_VAL
+  unset val SECRET_VAL SECRET_DESC SECRET_KEY
   chmod 600 "$EXPERTS/$name/.env"
-  ok "$var 已寫入 private/experts/$name/.env"
-  # env_file 在建立容器時讀取 → 必須重建
-  dc up -d --force-recreate "$name" >/dev/null 2>&1 && ok "容器已重建以載入新變數"
-  dim "  專家可用 printenv $var 取得，不需經過對話"
+  ok "$key 已寫入 private/experts/$name/.env（說明：$desc）"
+  # 不用重啟：.env 是整份目錄掛載，專家需要時直接讀 /opt/bootstrap/expert/.env
+  dim "  專家讀取方式：grep '^$key=' /opt/bootstrap/expert/.env | cut -d= -f2-"
 }
 
 cmd_logs() {
@@ -165,7 +195,10 @@ TXT
       3) ./scripts/refresh.sh ;;
       4) ./scripts/doctor.sh ;;
       5) read -rp "專家代號: " n; cmd_logs "$n" ;;
-      6) read -rp "專家代號: " n; read -rp "變數名: " v; cmd_secret "$n" "$v" ;;
+      6) read -rp "專家代號: " n
+         read -rp "這條密碼是做什麼的（說明）: " d
+         read -rp "KEY_NAME（大寫，例 NGB_GIT_TOKEN）: " k
+         cmd_secret "$n" "$d" "$k" ;;
       7) read -rp "專家代號: " n; cmd_approve "$n" ;;
       8) for n in $(list_experts); do dc up -d --force-recreate "$n" >/dev/null 2>&1 && ok "重啟 $n"; done ;;
       9) read -rp "專家代號: " n; ./scripts/remove-expert.sh "$n" ;;
@@ -185,7 +218,7 @@ case "${1:-}" in
   refresh)       ./scripts/refresh.sh ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
-  secret)        cmd_secret "${2:-}" "${3:-}" ;;
+  secret)        cmd_secret "${2:-}" "${3:-}" "${4:-}" "${5:-}" ;;
   approve)       cmd_approve "${2:-}" "${3:-}" ;;
   start)         dc up -d "${2:?需要專家代號}" ;;
   stop)          dc stop "${2:?需要專家代號}" ;;

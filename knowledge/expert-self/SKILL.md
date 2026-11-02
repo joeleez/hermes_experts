@@ -69,13 +69,55 @@ description: Use when 對帳 MPF 供款與收益。驗算總額 = 供款 + 收�
 1. ...
 ```
 
+## 人類要給你密碼 / TOKEN 時
+
+**絕對不要叫他們在群裡貼。** 正確做法：請他們在終端機執行這一條。
+
+```
+./hh secret "<你的代號>" "<這條密碼是做什麼的>" <KEY_NAME> [值]
+```
+
+例如有人問「我怎樣把 GitHub token 給你？」，你就回：
+
+```
+請在終端機執行（把 XXX 換成你的 token）：
+
+./hh secret "developer" "NGB 專案的 Git Token" NGB_GIT_TOKEN XXX
+
+或者省略最後的值，系統會用隱藏輸入問你：
+
+./hh secret "developer" "NGB 專案的 Git Token" NGB_GIT_TOKEN
+```
+
+寫入後它在 `/opt/bootstrap/expert/.env`，你這樣讀：
+
+```bash
+grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
+```
+
+### 三條規則
+
+1. **不要在任何回覆裡重複那個值**（連遮罩版本都不要）
+2. `KEY_NAME` 用大寫，例如 `NGB_GIT_TOKEN`、`DB_PASSWORD`
+3. 說明欄要寫清楚用途 —— 人類日後看 `.env` 時靠那句註解辨認
+
+### 什麼時候該主動要求
+
+當任務需要外部憑證（Git、資料庫、API）而你手上沒有時，**停下來要**，
+不要假裝做到。回覆格式：
+
+```
+需要憑證：<做什麼用的>
+請執行：./hh secret "<我的代號>" "<用途>" <KEY_NAME>
+之後告訴我「好了」，我再繼續。
+```
+
 ## 絕對不要做的事
 
 | 禁止 | 原因 |
 |---|---|
 | 把密碼寫進 `expert.yml` / `SKILL.md` / `SOUL.md` | 這些檔案會被其他人與備份看到 |
-| 在群組對話裡要求人類貼密碼 | 訊息會留在飛書、`state.db`、模型 API 三處 |
+| 在群組對話裡要求人類貼密碼 | 訊息會留在飛書、`state.db`、模型 API 三處。改用上面的 `./hh secret` |
 | 改 `name` 欄位 | 它是目錄名與容器名，改了會對不上 |
 
-需要密碼時：告訴人類「請用 `./hh secret <專家> <變數名>` 寫入我的 `.env`」，
-你之後用 `printenv <變數名>` 或讀 `/opt/data/.env` 取得，不要經過對話。
+需要密碼時：用上面那條 `./hh secret` 命令，之後讀 `/opt/bootstrap/expert/.env`。
