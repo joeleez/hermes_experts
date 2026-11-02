@@ -178,13 +178,22 @@ fi
 # ── 下一步 ──────────────────────────────────────────────
 echo
 hr
-printf '%s下一步%s\n' "$C_B" "$C_0"
+printf '%s下一步（三步，缺一不可）%s\n' "$C_B" "$C_0"
 cat <<TXT
   1. 群設定 → 群組機械人 → 添加機械人 → 搜尋「$TITLE」→ 加入
-  2. 在群裡打：@$TITLE 你好
-  3. 回到終端機：./hh sync        （記錄它在哪些群）
 
-  之後你可以直接在群裡告訴它「你負責什麼、照什麼步驟做」，
-  它會自己寫回 private/experts/$NAME/expert.yml。
+  2. 在群裡打：@$TITLE 你好
+     → 它會回一段「I don't recognize you yet」+ 8 位配對碼
+       （這是飛書的安全機制：每個專家都是獨立 Hermes，第一次要批核）
+
+  3. 回終端機批核：
+     ./hh approve $NAME            ← 會問你配對碼
+     或 ./hh approve $NAME 1234ABCD
+
+  批核後再 @ 它一次，它就會正常回答了。
+
+  ─ 之後可以直接在群裡告訴它「你負責什麼、照什麼步驟做」，
+    它會自己寫回 private/experts/$NAME/expert.yml（其他專家即時可見）。
+  ─ 不需要跑 ./hh sync：群組資訊是即時查飛書的，加入群不用任何指令。
 TXT
 hr
