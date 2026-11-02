@@ -113,12 +113,6 @@ if [ -f /opt/bootstrap/peers.yaml ]; then
   log "peers.yaml（$(grep -c '^- name:' "$H/peers.yaml" 2>/dev/null || echo 0) 位專家）"
 fi
 
-# ── 6. 我在哪些群（每次刷新；可能不存在）───────────────
-if [ -f /opt/bootstrap/groups.yaml ]; then
-  cp /opt/bootstrap/groups.yaml "$H/groups.yaml"
-  log "groups.yaml 已同步"
-fi
-
 # ── 7. 我是誰（每次重寫）────────────────────────────────
 if [ -f "$E/expert.yml" ]; then
   /opt/hermes/.venv/bin/python - "$E/expert.yml" "$H" <<'PY' || log "警告：identity.yaml 產生失敗"

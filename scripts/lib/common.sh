@@ -7,7 +7,6 @@ PRIV="$ROOT/private"
 EXPERTS="$PRIV/experts"
 GEN_COMPOSE="$PRIV/compose.experts.yml"
 PEERS="$PRIV/peers.yaml"
-GROUPS="$PRIV/groups.yaml"
 BASE_COMPOSE="$ROOT/docker-compose.base.yml"
 
 if [ -t 1 ]; then

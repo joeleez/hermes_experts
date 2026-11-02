@@ -22,10 +22,55 @@ cmd_list() {
   local exps; exps="$(list_experts)"
   [ -z "$exps" ] && { warn "還沒有專家（./hh new）"; return 0; }
 
-  printf '\n%s%-12s %-16s %-10s %s%s\n' "$C_B" "代號" "群裡名稱" "容器" "所在群" "$C_0"
+  # 群組即時查詢：用每位專家自己的憑證問飛書「我在哪些群」
+  # 不落地成檔案，所以「把專家拉進群」之後不需要跑任何指令。
+  local gmap; gmap="$(python3 - "$EXPERTS" "$ROOT" <<'PY' 2>/dev/null
+import json, os, sys, urllib.error, urllib.request
+experts_dir, root = sys.argv[1], sys.argv[2]
+
+def load_env(path, base):
+    d = dict(base)
+    if os.path.exists(path):
+        for line in open(path, encoding="utf-8"):
+            s = line.strip()
+            if s and not s.startswith("#") and "=" in s:
+                k, v = s.split("=", 1)
+                d[k.strip()] = v.strip()
+    return d
+
+shared = load_env(os.path.join(root, ".env"), {})
+for name in sorted(os.listdir(experts_dir)):
+    cfg = os.path.join(experts_dir, name, "expert.yml")
+    if not os.path.isfile(cfg):
+        continue
+    env = load_env(os.path.join(experts_dir, name, ".env"), shared)
+    app_id, secret = env.get("FEISHU_APP_ID", ""), env.get("FEISHU_APP_SECRET", "")
+    if not app_id or not secret:
+        print(f"{name}\t(憑證缺失)"); continue
+    base = "https://open.larksuite.com" if (env.get("FEISHU_DOMAIN") or "lark").startswith("lark") \
+        else "https://open.feishu.cn"
+    try:
+        req = urllib.request.Request(
+            base + "/open-apis/auth/v3/tenant_access_token/internal",
+            data=json.dumps({"app_id": app_id, "app_secret": secret}).encode(),
+            headers={"Content-Type": "application/json"})
+        tok = json.load(urllib.request.urlopen(req, timeout=15))["tenant_access_token"]
+        req = urllib.request.Request(base + "/open-apis/im/v1/chats?page_size=100",
+                                     headers={"Authorization": "Bearer " + tok})
+        items = json.load(urllib.request.urlopen(req, timeout=15)).get("data", {}).get("items", []) or []
+        names = [i.get("name") or i.get("chat_id") for i in items]
+        print(f"{name}\t{', '.join(names) if names else '未加入任何群'}")
+    except urllib.error.HTTPError as e:
+        print(f"{name}\t(查詢失敗 HTTP {e.code})")
+    except Exception:
+        print(f"{name}\t(連不上飛書)")
+PY
+)"
+
+  printf '\n%s%-12s %-18s %-10s %s%s\n' "$C_B" "代號" "群裡名稱" "容器" "所在群" "$C_0"
   hr
   for n in $exps; do
-    local title status groups base
+    local title status groups
     title="$(expert_field "$n" title)"
     if docker ps --format '{{.Names}}' | grep -qx "hermes-$n"; then
       status="$(docker inspect "hermes-$n" --format '{{.State.Health.Status}}' 2>/dev/null)"
@@ -33,16 +78,8 @@ cmd_list() {
     else
       status="${C_DIM}已停止${C_0}"
     fi
-    groups="$(python3 - "$GROUPS" "$n" <<'PY' 2>/dev/null || true
-import sys, yaml, os
-p, name = sys.argv[1], sys.argv[2]
-if not os.path.exists(p): print("-"); raise SystemExit
-rows = yaml.safe_load(open(p, encoding="utf-8")) or []
-hits = [r.get("name") or r.get("chat_id") for r in rows if name in (r.get("experts") or [])]
-print(", ".join(hits) if hits else "-")
-PY
-)"
-    printf '%-12s %-16s %-10b %s\n' "$n" "$title" "$status" "$groups"
+    groups="$(printf '%s\n' "$gmap" | awk -F'\t' -v k="$n" '$1==k{print $2}')"
+    printf '%-12s %-18s %-10b %s\n' "$n" "$title" "$status" "${groups:-?}"
   done
   printf '\n'
 }
@@ -111,8 +148,7 @@ menu() {
     cat <<'TXT'
  1) 新增專家
  2) 列出專家
- 3) 群組同步（哪些群、哪些專家在裡面）
-10) 熱更新名冊（新專家加入後，讓所有人馬上認識它）
+ 3) 熱更新名冊（新專家加入後，讓所有人馬上認識它）
  4) 體檢
  5) 看日誌
  6) 設定專家密碼
@@ -126,8 +162,7 @@ TXT
     case "$choice" in
       1) ./scripts/add-expert.sh ;;
       2) cmd_list ;;
-      3) ./scripts/sync-groups.sh ;;
-      10) ./scripts/refresh.sh ;;
+      3) ./scripts/refresh.sh ;;
       4) ./scripts/doctor.sh ;;
       5) read -rp "專家代號: " n; cmd_logs "$n" ;;
       6) read -rp "專家代號: " n; read -rp "變數名: " v; cmd_secret "$n" "$v" ;;
@@ -146,7 +181,7 @@ case "${1:-}" in
   "")            menu ;;
   new)           ./scripts/add-expert.sh ;;
   list|ls)       cmd_list ;;
-  sync)          ./scripts/sync-groups.sh ;;
+  sync)          cmd_list ;;   # 群組已改為即時查詢，sync 保留為相容別名
   refresh)       ./scripts/refresh.sh ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;

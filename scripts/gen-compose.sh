@@ -11,7 +11,6 @@ mkdir -p "$EXPERTS"
 # bind-mount 的來源檔若不存在，docker 會自動建成「目錄」，容器內就變成讀不到檔案。
 # 所以先確保這兩個檔案存在。
 [ -f "$PEERS" ] || printf '# 尚無專家\n' > "$PEERS"
-[ -f "$GROUPS" ] || printf '# 尚未同步（跑 ./hh sync）\n' > "$GROUPS"
 
 python3 - "$EXPERTS" "$GEN_COMPOSE" "$ROOT" <<'PY'
 import os, sys
@@ -50,7 +49,6 @@ for entry in sorted(os.listdir(experts_dir)):
             "./knowledge:/opt/bootstrap/knowledge:ro",
             f"./private/experts/{name}:/opt/bootstrap/expert",
             "./private/peers.yaml:/opt/bootstrap/peers.yaml:ro",
-            "./private/groups.yaml:/opt/bootstrap/groups.yaml:ro",
         ],
         "networks": ["experts"],
         "stop_grace_period": "30s",

@@ -26,7 +26,7 @@
 |---|---|---|---|
 | 框架 | compose、Dockerfile、腳本、共用知識、schema | repo 根目錄、`knowledge/`、`scripts/` | ✅ |
 | 專家 | 名稱、簡介、長處、能力 | `private/experts/<name>/expert.yml` | ❌ |
-| 部署 | 群組對照、生成的 compose、名冊 | `private/groups.yaml`、`peers.yaml`、`compose.experts.yml` | ❌ |
+| 部署 | 生成的 compose、名冊 | `private/compose.experts.yml`、`peers.yaml` | ❌ |
 
 `git clone` 之後是空機 —— 這是刻意的：**repo 是機器，不是你的專家名單**。
 
@@ -59,12 +59,14 @@ s6 cont-init（root）
  ├─ 每次：共用知識 knowledge/* → /opt/data/skills/
  ├─ 每次：專屬技能 expert/skills/* → /opt/data/skills/
  ├─ 每次：憑證 → /opt/data/.env（600）
- ├─ 每次：peers.yaml、groups.yaml → /opt/data/
+ ├─ 每次：peers.yaml → /opt/data/
  └─ 每次：identity.yaml（我是誰 + 其他專家是誰）
 ```
 
 `identity.yaml` 由 `expert.yml` 產生，所以你在群裡叫它改職責 → 它寫回 `expert.yml` →
-下次開機 `identity.yaml` 與所有人的 `peers.yaml` 都會更新。
+下次開機 `identity.yaml` 與所有人的 `peers.yaml` 都會更新（不想重啟就 `./hh refresh`）。
+
+「它在哪些群」不落地成檔案 —— 需要時即時問飛書 `/im/v1/chats`，避免幫 deployment 資料做快取。
 
 ## 三個踩過的坑（已內建修復）
 

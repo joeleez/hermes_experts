@@ -17,7 +17,6 @@ for name in $(list_experts); do
     continue
   fi
   docker cp "$PEERS" "$c:/opt/bootstrap/peers.yaml" >/dev/null 2>&1 || true
-  [ -f "$GROUPS" ] && docker cp "$GROUPS" "$c:/opt/bootstrap/groups.yaml" >/dev/null 2>&1 || true
   if docker exec -u 0 "$c" /etc/cont-init.d/99-seed-agent >/dev/null 2>&1; then
     n="$(docker exec "$c" sh -c "awk '/^- name:/{n++} END{print (n>0?n-1:0)}' /opt/data/peers.yaml" 2>/dev/null)"
     ok "$name 已更新（其他專家 $n 位）"

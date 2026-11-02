@@ -14,7 +14,7 @@
 | `Dockerfile` | `private/experts/<name>/SOUL.md`（性格） |
 | `knowledge/`（群組禮儀、自我更新） | `private/experts/<name>/skills/`（專屬技能） |
 | `schemas/`、`templates/`（格式） | `private/experts/<name>/.env`（App ID/Secret） |
-| `scripts/`、`hh`（工具） | `private/compose.experts.yml`、`peers.yaml`、`groups.yaml`（生成物） |
+| `scripts/`、`hh`（工具） | `private/compose.experts.yml`、`peers.yaml`（生成物） |
 
 `git clone` 之後是**空機**：沒有任何專家。專家要一個一個用 `./hh new` 建。
 
@@ -32,7 +32,8 @@ chmod 600 .env
 
 1. **只被 @ 才回應** —— 專家不會自己跳出來講話
 2. **專家不 @ 任何人** —— 沒有 bot 對 bot 的迴圈
-3. **密碼不經過對話** —— 用 `./hh secret <專家> <變數名>`
+3. **拉進群不用指令** —— 飛書按完就生效，群組資訊即時查詢不留檔案
+4. **密碼不經過對話** —— 用 `./hh secret <專家> <變數名>`
 
 ## 文件
 
