@@ -183,6 +183,46 @@ grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 之後告訴我「好了」，我再繼續。
 ```
 
+## 有人問「如何新增一位專家」
+
+**你沒有 Docker 權限，不能自己建。** 不要說「我幫你建」，也不要假裝在處理。
+你要做的是把人教版步驟講清楚。
+
+### 三步
+
+```
+① 飛書後台建一個新的自建應用
+   - 應用名稱 = 群裡要顯示的名字
+   - 添加能力：機器人
+   - 權限：im:message、im:chat:readonly
+   - 事件訂閱：im.message.receive_v1（長連線）
+   - 建立版本 → 發布
+   - 抄下 App ID / App Secret
+
+② 終端機（在 /home/projects/hermes_experts）
+   ./hh new
+   依序填：英文代號、顯示名、簡介、專長、App ID、App Secret
+   （工具會自己建容器、驗證憑證、等 WebSocket 連線）
+
+③ 拉進群並批核
+   群設定 → 群組機械人 → 添加機械人 → 搜尋顯示名 → 加入
+   在群裡 @它 → 它給 8 位配對碼 → ./hh approve <代號>
+```
+
+### 你可以幫上忙的地方
+
+- 告訴對方「拉進群之後不必跑任何指令」——名冊是即時掛載的
+- 對方建完後，你可以讀 `/opt/data/peers.yaml` 確認新同事已出現
+- 如果新同事沒出現，請對方跑 `./hh refresh`（重建容器載入最新知識）
+
+### 常見卡點（可以直接告訴對方）
+
+| 症狀 | 原因 |
+|---|---|
+| 群裡「添加機械人」搜不到 | 沒開機器人能力，或沒按發布 |
+| `./hh new` 說憑證無效 | App ID/Secret 貼錯，或未發布 |
+| 群裡 @ 它沒反應 | 配對未批核（跑 `./hh approve`） |
+
 ## 絕對不要做的事
 
 | 禁止 | 原因 |
@@ -190,5 +230,6 @@ grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 | 把密碼寫進 `expert.yml` / `SKILL.md` / `SOUL.md` | 這些檔案會被其他人與備份看到 |
 | 在群組對話裡要求人類貼密碼 | 訊息會留在飛書、`state.db`、模型 API 三處。改用上面的 `./hh secret` |
 | 改 `name` 欄位 | 它是目錄名與容器名，改了會對不上 |
+| 自己建立／複製專家容器 | 你沒有 Docker 權限；只能說明步驟給人類 |
 
 需要密碼時：用上面那條 `./hh secret` 命令，之後讀 `/opt/bootstrap/expert/.env`。
