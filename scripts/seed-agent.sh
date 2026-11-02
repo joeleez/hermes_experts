@@ -107,12 +107,6 @@ mv "$TMP" "$H/.env"
 chmod 600 "$H/.env" 2>/dev/null || true
 log ".env（$n 個變數）"
 
-# ── 5. 名冊：其他專家（每次刷新）────────────────────────
-if [ -f /opt/bootstrap/peers.yaml ]; then
-  cp /opt/bootstrap/peers.yaml "$H/peers.yaml"
-  log "peers.yaml（$(grep -c '^- name:' "$H/peers.yaml" 2>/dev/null || echo 0) 位專家）"
-fi
-
 # ── 7. 我是誰（每次重寫）────────────────────────────────
 if [ -f "$E/expert.yml" ]; then
   /opt/hermes/.venv/bin/python - "$E/expert.yml" "$H" <<'PY' || log "警告：identity.yaml 產生失敗"
@@ -121,12 +115,6 @@ import yaml
 
 cfg_path, home = sys.argv[1], sys.argv[2]
 me = yaml.safe_load(open(cfg_path, encoding="utf-8")) or {}
-
-peers = []
-peers_path = os.path.join(home, "peers.yaml")
-if os.path.exists(peers_path):
-    peers = yaml.safe_load(open(peers_path, encoding="utf-8")) or []
-peers = [p for p in peers if p.get("name") != me.get("name")]
 
 identity = {
     "agent": me.get("name", ""),
@@ -137,8 +125,7 @@ identity = {
     "capabilities": me.get("capabilities") or [],
     "cannot": me.get("cannot") or [],
     "require_mention": True,
-    "peers": [p.get("name") for p in peers],
-    "peers_detail": peers,
+    "peers_source": "/opt/data/peers.yaml（每次讀都是最新）",
 }
 with open(os.path.join(home, "identity.yaml"), "w", encoding="utf-8") as fh:
     fh.write("# 由 seed-agent.sh 每次啟動產生，請勿手改\n")

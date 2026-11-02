@@ -45,10 +45,11 @@ for entry in sorted(os.listdir(experts_dir)):
         },
         "volumes": [
             f"{name}-data:/opt/data",
+            # 直接掛同一個檔案：宿主重寫 → 容器即時看到，不需要重啟或 refresh
+            "./private/peers.yaml:/opt/data/peers.yaml",
             "./scripts/seed-agent.sh:/etc/cont-init.d/99-seed-agent:ro",
             "./knowledge:/opt/bootstrap/knowledge:ro",
             f"./private/experts/{name}:/opt/bootstrap/expert",
-            "./private/peers.yaml:/opt/bootstrap/peers.yaml:ro",
         ],
         "networks": ["experts"],
         "stop_grace_period": "30s",
