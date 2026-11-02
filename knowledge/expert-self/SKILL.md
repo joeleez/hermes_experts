@@ -108,7 +108,13 @@ description: Use when 對帳 MPF 供款與收益。驗算總額 = 供款 + 收�
 ./hh secret_update "developer" NGB_GIT_TOKEN
 ```
 
-（說明欄可省略；要改說明加 `--desc "新的說明"`。）
+三種更新方式（都不會要求重輸你不想改的部分）：
+
+| 想改 | 指令 |
+|---|---|
+| 只改值 | `./hh secret_update developer NGB_GIT_TOKEN` |
+| 只改說明 | `./hh secret_update developer NGB_GIT_TOKEN --desc "新的說明"` |
+| 兩者都改 | `./hh secret_update developer NGB_GIT_TOKEN 新值 --desc "新的說明"` |
 
 ### 你怎麼讀
 

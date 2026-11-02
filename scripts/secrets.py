@@ -51,15 +51,26 @@ def cmd_create(path, key, desc, value):
 
 
 def cmd_update(path, key, desc, value):
+    """value 為空字串 = 只改說明，保留原值（不會要求重輸）。"""
     lines = read(path)
     i, desc_i = find(lines, key)
     if i is None:
         sys.exit(f"✗ {key} 不存在，請用 ./hh secret_create 新增它")
-    lines[i] = f"{key}={value}"
-    if desc and desc_i is not None:
-        lines[desc_i] = f"# {desc}"
+    if not value and not desc:
+        sys.exit("✗ 沒有東西要更新（值與說明都空白）")
+
+    changed = []
+    if value:
+        lines[i] = f"{key}={value}"
+        changed.append("值")
+    if desc:
+        if desc_i is not None:
+            lines[desc_i] = f"# {desc}"
+        else:
+            lines.insert(i, f"# {desc}")
+        changed.append("說明")
     write(path, lines)
-    print(f"✓ 已更新 {key}")
+    print(f"✓ 已更新 {key}（{'、'.join(changed)}）")
 
 
 def cmd_delete(path, key):

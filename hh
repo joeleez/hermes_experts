@@ -120,11 +120,11 @@ cmd_secret_create() {
 
 cmd_secret_update() {
   # ./hh secret_update <專家> <KEY_NAME> [值] [--desc "<新說明>"]
-  local name="${1:-}" key="${2:-}"; shift 2 2>/dev/null || true
+  local name="${1:-}" key="${2:-}"; shift 2 2>/dev/null || shift $# 2>/dev/null || true
   local val="" desc=""
   while [ $# -gt 0 ]; do
     case "$1" in
-      --desc) desc="${2:-}"; shift 2 ;;
+      --desc) desc="${2:-}"; shift 2 2>/dev/null || shift ;;
       *) [ -z "$val" ] && val="$1"; shift ;;
     esac
   done
@@ -134,7 +134,7 @@ cmd_secret_update() {
     return 1
   fi
   [ -f "$EXPERTS/$name/.env" ] || { bad "找不到 private/experts/$name/.env"; return 1; }
-  if [ -z "$val" ]; then
+  if [ -z "$val" ] && [ -z "$desc" ]; then
     read -rsp "輸入 $key 的新值（不顯示）: " val; echo
     [ -n "$val" ] || { bad "空值，取消"; return 1; }
   fi
@@ -234,9 +234,9 @@ case "${1:-}" in
   refresh)       ./scripts/refresh.sh ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
-  secret_create) cmd_secret_create "${2:-}" "${3:-}" "${4:-}" "${5:-}" ;;
-  secret_update) cmd_secret_update "${2:-}" "${3:-}" "${4:-}" "${5:-}" ;;
-  secret_delete) cmd_secret_delete "${2:-}" "${3:-}" ;;
+  secret_create) shift; cmd_secret_create "$@" ;;
+  secret_update) shift; cmd_secret_update "$@" ;;
+  secret_delete) shift; cmd_secret_delete "$@" ;;
   secret_list)   cmd_secret_list "${2:-}" ;;
   secret)        bad "./hh secret 已取消，改用 secret_create / secret_update / secret_delete" ;;
   approve)       cmd_approve "${2:-}" "${3:-}" ;;
