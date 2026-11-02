@@ -1,0 +1,12 @@
+# 由 ./hh 或 scripts/add-expert.sh 生成；請勿手改成別人的名字
+name: __NAME__
+title: "__TITLE__"
+summary: "__SUMMARY__"
+strengths:
+  - __STRENGTH_1__
+capabilities:
+  - （待補：具體會做什麼）
+cannot:
+  - （待補：明確不做什麼）
+created_at: "__CREATED_AT__"
+updated_at: "__CREATED_AT__"

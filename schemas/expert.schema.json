@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "expert.yml — 一位專家的結構定義",
+  "description": "這份 schema 進 git（結構）；符合它的實際檔案在 private/experts/<name>/expert.yml（不進 git）。",
+  "type": "object",
+  "required": ["name", "title", "summary"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "英文代號，也是容器與目錄名（例：mpf、developer）"
+    },
+    "title": {
+      "type": "string",
+      "description": "在飛書群裡顯示的名稱（例：MPF專家）"
+    },
+    "summary": {
+      "type": "string",
+      "description": "一句話職責。其他專家靠這句話判斷「該不該建議來找你」"
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "擅長什麼（短詞，例：強積金、對帳）"
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "具體會做的事"
+    },
+    "cannot": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "明確不做的事（防止越界）"
+    },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

@@ -1,0 +1,14 @@
+# 框架層：只放「怎麼跑」，不放「誰在跑」
+#
+# 個別專家的 service 由 scripts/gen-compose.sh 生成到
+# private/compose.experts.yml（不進 git）。使用方式：
+#
+#   docker compose -f docker-compose.base.yml -f private/compose.experts.yml up -d
+#
+# 或直接用 ./hh（它會自動帶這串參數）
+name: hermes-experts
+
+networks:
+  experts:
+    driver: bridge
+    name: hermes-experts
