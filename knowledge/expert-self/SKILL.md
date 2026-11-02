@@ -191,13 +191,7 @@ grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 ### 三步
 
 ```
-① 飛書後台建一個新的自建應用
-   - 應用名稱 = 群裡要顯示的名字
-   - 添加能力：機器人
-   - 權限：im:message、im:chat:readonly
-   - 事件訂閱：im.message.receive_v1（長連線）
-   - 建立版本 → 發布
-   - 抄下 App ID / App Secret
+① 飛書後台建應用（用一鍵範本最快，見下）
 
 ② 終端機（在 /home/projects/hermes_experts）
    ./hh new
@@ -208,6 +202,23 @@ grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
    群設定 → 群組機械人 → 添加機械人 → 搜尋顯示名 → 加入
    在群裡 @它 → 它給 8 位配對碼 → ./hh approve <代號>
 ```
+
+### 建應用：優先用「立即創建」範本
+
+Lark 開發者後台（open.larksuite.com/app）首頁有一張卡片
+**「創建 Lark 智能體 應用」→ 立即創建**，它會預先設好智能體所需的權限與事件配置
+（卡片上就寫著可接入 Hermes Agent）。
+
+請對方：
+
+1. 按「立即創建」
+2. 應用名稱填群裡要顯示的名字
+3. **檢查事件訂閱方式是「長連線」**（範本偶爾預設 webhook，那樣容器收不到訊息）
+4. 建立版本 → 發布
+5. 到「憑證與基礎資訊」抄 App ID / App Secret
+
+若沒有那张卡片，才退回手動：機器人能力 + `im:message` + `im:chat:readonly`
++ `im.message.receive_v1`（長連線）+ 發布。
 
 ### 你可以幫上忙的地方
 

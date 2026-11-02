@@ -55,13 +55,18 @@ echo
 hr
 printf '%s現在需要在飛書後台建一個自建應用%s\n' "$C_B" "$C_0"
 cat <<'TXT'
-  1. 開放平台 → 建立企業自建應用 → 名稱填上面的顯示名稱
-  2. 添加「機器人」能力
-  3. 權限管理 → 加入：
-        im:message            收發訊息
-        im:chat:readonly      讀取群組資訊（判斷自己在哪些群）
-  4. 事件訂閱 → im.message.receive_v1（長連線模式）
-  5. 建立版本 → 發布
+  最快：open.larksuite.com/app 首頁 →「創建 Lark 智能體 應用」→ 立即創建
+        （一鍵設好機器人能力與權限），然後：
+          1. 應用名稱填上面的顯示名稱
+          2. 檢查事件訂閱方式是「長連線」
+          3. 建立版本 → 發布
+
+  若沒有那張卡片，手動做：
+          1. 建立企業自建應用 → 名稱填顯示名稱
+          2. 添加「機器人」能力
+          3. 權限：im:message、im:chat:readonly
+          4. 事件訂閱：im.message.receive_v1（長連線）
+          5. 建立版本 → 發布
 TXT
 hr
 read -rp "完成後按 Enter 繼續…" _ || true
