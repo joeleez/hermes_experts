@@ -133,7 +133,15 @@ FEISHU_APP_ID=$APP_ID
 FEISHU_APP_SECRET=$APP_SECRET
 ENV
 chmod 600 "$D/.env"
-chmod 700 "$D" 2>/dev/null || true
+
+# 專家目錄必須讓「容器內的 hermes（uid 10000）」讀寫：
+#   讀 .env 拿憑證、寫 expert.yml 更新自己的職責。
+# 用 700 root 會讓 agent 得到 Permission denied（實際踩過）。
+# 宿主 root 不受權限限制，所以 ./hh 仍然寫得進去。
+chown -R 10000:10000 "$D" 2>/dev/null || true
+chmod 755 "$D" "$D/skills" 2>/dev/null || true
+chmod 644 "$D/SOUL.md" "$D/expert.yml" 2>/dev/null || true
+chmod 600 "$D/.env"
 
 ok "private/experts/$NAME/（expert.yml、SOUL.md、skills/、.env）"
 

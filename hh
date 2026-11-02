@@ -6,6 +6,7 @@
 #   ./hh list        列出專家（狀態、在哪個群）
 #   ./hh sync        重新掃描群組
 #   ./hh refresh     套用技能更新（名冊已即時同步，不需這步）
+#   ./hh fix-perms   修正專家目錄權限（agent 讀不到 .env 時用）
 #   ./hh doctor      體檢
 #   ./hh logs <n>    看日誌
 #   ./hh secret_create <n> "<說明>" <KEY_NAME> [值]
@@ -238,6 +239,7 @@ case "${1:-}" in
   secret_update) shift; cmd_secret_update "$@" ;;
   secret_delete) shift; cmd_secret_delete "$@" ;;
   secret_list)   cmd_secret_list "${2:-}" ;;
+  fix-perms)     ./scripts/fix-perms.sh ;;
   secret)        bad "./hh secret 已取消，改用 secret_create / secret_update / secret_delete" ;;
   approve)       cmd_approve "${2:-}" "${3:-}" ;;
   start)         dc up -d "${2:?需要專家代號}" ;;

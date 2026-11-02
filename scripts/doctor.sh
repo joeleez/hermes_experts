@@ -62,6 +62,18 @@ for name in $EXPS; do
   docker exec "$c" sh -c "grep -q '^FEISHU_APP_ID=cli_' /opt/data/.env" 2>/dev/null \
     && ok "App ID 已設定" || { bad "缺 App ID"; FAIL=1; }
 
+  # 7.5 專家目錄權限（容器 uid 10000 要能讀 .env、寫 expert.yml）
+  if docker exec -u hermes "$c" sh -c "test -r /opt/bootstrap/expert/.env" 2>/dev/null; then
+    ok "agent 可讀 secrets（/opt/bootstrap/expert/.env）"
+  else
+    bad "agent 讀不到 .env（跑 ./hh fix-perms）"; FAIL=1
+  fi
+  if docker exec -u hermes "$c" sh -c "test -w /opt/bootstrap/expert/expert.yml" 2>/dev/null; then
+    ok "agent 可寫自己的 expert.yml"
+  else
+    warn "agent 不能寫 expert.yml（職責無法自我更新；跑 ./hh fix-perms）"
+  fi
+
   # 8. 名冊（peers.yaml 含自己，所以要扣掉）
   if docker exec "$c" test -f /opt/data/peers.yaml 2>/dev/null; then
     n="$(docker exec "$c" sh -c "awk '/^- name:/{n++} END{print (n>0?n-1:0)}' /opt/data/peers.yaml" 2>/dev/null)"

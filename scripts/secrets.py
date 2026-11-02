@@ -26,6 +26,11 @@ def write(path, lines):
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     os.chmod(path, 0o600)
+    # 容器內的 agent 是 uid 10000，檔案必須讓它讀得到
+    try:
+        os.chown(path, 10000, 10000)
+    except PermissionError:
+        pass
 
 
 def find(lines, key):

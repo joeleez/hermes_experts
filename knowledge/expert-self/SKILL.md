@@ -124,6 +124,15 @@ description: Use when 對帳 MPF 供款與收益。驗算總額 = 供款 + 收�
 grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 ```
 
+若真的遇到 `Permission denied`：**不要叫人類 sudo chmod，也不要建議改寫到
+/opt/data**。那是宿主權限設錯，請人類跑一次：
+
+```
+./hh fix-perms
+```
+
+它會把 expert 目錄交給容器內的使用者（uid 10000）。
+
 或用 `./hh secret_list <你的代號>` 看有哪些 KEY（只列名稱，不顯示值）。
 
 ### 三條規則
