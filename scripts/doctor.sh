@@ -62,9 +62,9 @@ for name in $EXPS; do
   docker exec "$c" sh -c "grep -q '^FEISHU_APP_ID=cli_' /opt/data/.env" 2>/dev/null \
     && ok "App ID 已設定" || { bad "缺 App ID"; FAIL=1; }
 
-  # 8. 名冊
+  # 8. 名冊（peers.yaml 含自己，所以要扣掉）
   if docker exec "$c" test -f /opt/data/peers.yaml 2>/dev/null; then
-    n="$(docker exec "$c" sh -c "grep -c '^- name:' /opt/data/peers.yaml" 2>/dev/null)"
+    n="$(docker exec "$c" sh -c "awk '/^- name:/{n++} END{print (n>0?n-1:0)}' /opt/data/peers.yaml" 2>/dev/null)"
     ok "peers.yaml（其他專家 $n 位）"
   else
     warn "缺 peers.yaml（只影響「認識其他專家」）"
