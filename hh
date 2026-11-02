@@ -5,6 +5,7 @@
 #   ./hh new         新增專家
 #   ./hh list        列出專家（狀態、在哪個群）
 #   ./hh sync        重新掃描群組
+#   ./hh refresh     熱更新名冊（不用重啟）
 #   ./hh doctor      體檢
 #   ./hh logs <n>    看日誌
 #   ./hh secret <n> <變數名>
@@ -111,6 +112,7 @@ menu() {
  1) 新增專家
  2) 列出專家
  3) 群組同步（哪些群、哪些專家在裡面）
+10) 熱更新名冊（新專家加入後，讓所有人馬上認識它）
  4) 體檢
  5) 看日誌
  6) 設定專家密碼
@@ -125,6 +127,7 @@ TXT
       1) ./scripts/add-expert.sh ;;
       2) cmd_list ;;
       3) ./scripts/sync-groups.sh ;;
+      10) ./scripts/refresh.sh ;;
       4) ./scripts/doctor.sh ;;
       5) read -rp "專家代號: " n; cmd_logs "$n" ;;
       6) read -rp "專家代號: " n; read -rp "變數名: " v; cmd_secret "$n" "$v" ;;
@@ -144,6 +147,7 @@ case "${1:-}" in
   new)           ./scripts/add-expert.sh ;;
   list|ls)       cmd_list ;;
   sync)          ./scripts/sync-groups.sh ;;
+  refresh)       ./scripts/refresh.sh ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
   secret)        cmd_secret "${2:-}" "${3:-}" ;;
