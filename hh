@@ -8,6 +8,7 @@
 #   ./hh doctor      體檢
 #   ./hh logs <n>    看日誌
 #   ./hh secret <n> <變數名>
+#   ./hh approve <n> [配對碼]
 #   ./hh start|stop|restart <n> | restart-all
 #   ./hh rm <n>      移除專家（保留記憶）
 #   ./hh update      拉新版框架並重建
@@ -43,6 +44,21 @@ PY
     printf '%-12s %-16s %-10b %s\n' "$n" "$title" "$status" "$groups"
   done
   printf '\n'
+}
+
+cmd_approve() {
+  local name="${1:-}" code="${2:-}"
+  [ -n "$name" ] || { bad "用法：./hh approve <專家> <配對碼>"; return 1; }
+  local c="hermes-$name"
+  docker ps --format '{{.Names}}' | grep -qx "$c" || { bad "$c 未啟動"; return 1; }
+  if [ -z "$code" ]; then
+    dim "$name 目前待批准的請求："
+    docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing list 2>&1 | sed 's/^/    /'
+    read -rp "配對碼（專家在飛書給你那個 8 位碼）: " code
+  fi
+  [ -n "$code" ] || { bad "沒有配對碼"; return 1; }
+  docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing approve feishu "$code" 2>&1 | tail -3
+  docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing list 2>&1 | tail -6
 }
 
 cmd_secret() {
@@ -98,8 +114,9 @@ menu() {
  4) 體檢
  5) 看日誌
  6) 設定專家密碼
- 7) 重啟全部
- 8) 移除專家
+ 7) 批核飛書使用者（配對碼）
+ 8) 重啟全部
+ 9) 移除專家
  0) 離開
 TXT
     hr
@@ -111,8 +128,9 @@ TXT
       4) ./scripts/doctor.sh ;;
       5) read -rp "專家代號: " n; cmd_logs "$n" ;;
       6) read -rp "專家代號: " n; read -rp "變數名: " v; cmd_secret "$n" "$v" ;;
-      7) for n in $(list_experts); do dc up -d --force-recreate "$n" >/dev/null 2>&1 && ok "重啟 $n"; done ;;
-      8) read -rp "專家代號: " n; ./scripts/remove-expert.sh "$n" ;;
+      7) read -rp "專家代號: " n; cmd_approve "$n" ;;
+      8) for n in $(list_experts); do dc up -d --force-recreate "$n" >/dev/null 2>&1 && ok "重啟 $n"; done ;;
+      9) read -rp "專家代號: " n; ./scripts/remove-expert.sh "$n" ;;
       0) exit 0 ;;
       *) warn "沒有這個選項" ;;
     esac
@@ -129,6 +147,7 @@ case "${1:-}" in
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
   secret)        cmd_secret "${2:-}" "${3:-}" ;;
+  approve)       cmd_approve "${2:-}" "${3:-}" ;;
   start)         dc up -d "${2:?需要專家代號}" ;;
   stop)          dc stop "${2:?需要專家代號}" ;;
   restart)       dc up -d --force-recreate "${2:?需要專家代號}" ;;
