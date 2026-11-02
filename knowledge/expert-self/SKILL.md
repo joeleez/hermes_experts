@@ -71,44 +71,68 @@ description: Use when 對帳 MPF 供款與收益。驗算總額 = 供款 + 收�
 
 ## 人類要給你密碼 / TOKEN 時
 
-**絕對不要叫他們在群裡貼。** 正確做法：請他們在終端機執行這一條。
+**絕對不要叫他們在群裡貼。** 正確做法：請他們在終端機執行對應的指令。
+
+| 情況 | 指令 |
+|---|---|
+| **還沒有**這個 KEY | `./hh secret_create <專家> "<說明>" <KEY_NAME> [值]` |
+| **已經有**，要換值 | `./hh secret_update <專家> <KEY_NAME> [值]` |
+| 要**刪除** | `./hh secret_delete <專家> <KEY_NAME>` |
+| 想知道有哪些 KEY | `./hh secret_list <專家>` |
+
+三個指令有**互相保護**的設計：
+
+- `secret_create` 遇到已存在的 KEY → **報錯**（不會覆蓋正在用的憑證）
+- `secret_update` / `secret_delete` 遇到不存在的 KEY → **報錯**（打錯字不會靜默新增）
+
+所以當它跟你說「已存在」或「不存在」時，那是提示你換另一條指令，不是壞掉。
+
+### 實際對話長相
+
+有人問：「我怎樣把 GitHub token 給你？」
+
+你回：
 
 ```
-./hh secret "<你的代號>" "<這條密碼是做什麼的>" <KEY_NAME> [值]
+請在終端機執行：
+
+./hh secret_create "developer" "NGB 專案的 Git Token" NGB_GIT_TOKEN
+
+系統會用隱藏輸入問你 token，貼上後按 Enter（不會顯示、不會留在 history）。
+寫完告訴我「好了」，我就能用。
 ```
 
-例如有人問「我怎樣把 GitHub token 給你？」，你就回：
+如果對方說「我已經給過，但要換新的」：
 
 ```
-請在終端機執行（把 XXX 換成你的 token）：
-
-./hh secret "developer" "NGB 專案的 Git Token" NGB_GIT_TOKEN XXX
-
-或者省略最後的值，系統會用隱藏輸入問你：
-
-./hh secret "developer" "NGB 專案的 Git Token" NGB_GIT_TOKEN
+./hh secret_update "developer" NGB_GIT_TOKEN
 ```
 
-寫入後它在 `/opt/bootstrap/expert/.env`，你這樣讀：
+（說明欄可省略；要改說明加 `--desc "新的說明"`。）
+
+### 你怎麼讀
+
+寫入後在 `/opt/bootstrap/expert/.env`，你這樣取：
 
 ```bash
 grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
 ```
 
+或用 `./hh secret_list <你的代號>` 看有哪些 KEY（只列名稱，不顯示值）。
+
 ### 三條規則
 
 1. **不要在任何回覆裡重複那個值**（連遮罩版本都不要）
-2. `KEY_NAME` 用大寫，例如 `NGB_GIT_TOKEN`、`DB_PASSWORD`
-3. 說明欄要寫清楚用途 —— 人類日後看 `.env` 時靠那句註解辨認
+2. `KEY_NAME` 用大寫：`NGB_GIT_TOKEN`、`DB_PASSWORD`
+3. 說明欄要寫清楚用途 —— 它會變成 `.env` 裡的註解，是人類日後辨認的依據
 
 ### 什麼時候該主動要求
 
-當任務需要外部憑證（Git、資料庫、API）而你手上沒有時，**停下來要**，
-不要假裝做到。回覆格式：
+任務需要外部憑證（Git、資料庫、API）而你手上沒有時，**停下來要**，不要假裝做到：
 
 ```
 需要憑證：<做什麼用的>
-請執行：./hh secret "<我的代號>" "<用途>" <KEY_NAME>
+請執行：./hh secret_create "<我的代號>" "<用途>" <KEY_NAME>
 之後告訴我「好了」，我再繼續。
 ```
 
