@@ -16,6 +16,7 @@
 #   ./hh start|stop|restart
 #   ./hh rm <n>      移除專家（保留記憶）
 #   ./hh schedule [HH:MM|off]  設定每日定時重啟
+#   ./hh board [名]  看板網址（本地唯讀網頁）
 #   ./hh admin       後台管理員是否在運作（心跳）
 #   ./hh update      拉新版框架並重建
 set -uo pipefail
@@ -282,6 +283,28 @@ human_age() {
   else printf '%d 天前' $(( s / 86400 )); fi
 }
 
+
+# ── 看板網頁（唯讀）────────────────────────────
+cmd_board() {
+  local name="${1:-}" base="http://localhost:8770"
+  local boards=""
+  if container_up; then
+    boards=$(docker exec "$C" sh -c 'ls /opt/data/kanban/boards 2>/dev/null' 2>/dev/null | tr -d '\r')
+  fi
+  if [ -n "$name" ]; then
+    [ -n "$boards" ] && ! printf '%s\n' "$boards" | grep -qx "$name" && warn "沒有這個看板：$name"
+    printf '%s/%s\n' "$base" "$name"
+    return 0
+  fi
+  printf '%s\n\n' "$base"
+  if [ -n "$boards" ]; then
+    printf '可用看板：\n'
+    printf '%s\n' "$boards" | while read -r b; do [ -n "$b" ] && printf '  %s/%s\n' "$base" "$b"; done
+  else
+    warn "容器沒跑，或還沒有看板"
+  fi
+}
+
 case "${1:-}" in
   "")            menu ;;
   new)           ./scripts/add-expert.sh ;;
@@ -303,6 +326,7 @@ case "${1:-}" in
   restart-all)   dc restart && ok "已重啟 $C" ;;
   rm)            ./scripts/remove-expert.sh "${2:-}" "${3:-}" ;;
   schedule)      ./scripts/schedule.sh "${2:-}" ;;
+  board|boards)  shift; cmd_board "${1:-}" ;;
   admin)         shift; cmd_admin "${1:-}" "${2:-}" ;;
   update)        cmd_update ;;
   -h|--help|help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;

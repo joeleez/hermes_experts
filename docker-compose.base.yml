@@ -8,7 +8,31 @@
 # 或直接用 ./hh（它會自動帶這串參數）
 name: hermes-experts
 
+services:
+  # 唯讀看板網頁：http://localhost:8770/<看板名>
+  # 只讀 hermes-experts-data 內的 kanban.db，不會寫入
+  kanban-board:
+    image: python:3.12-alpine
+    container_name: hermes-kanban-board
+    restart: unless-stopped
+    command: ["python3", "/app/server.py"]
+    environment:
+      KANBAN_DATA: /data
+      PORT: "8770"
+    volumes:
+      - board-data:/data
+      - ./kanban-board:/app:ro
+    ports:
+      - "127.0.0.1:8770:8770"
+    networks:
+      - experts
+
 networks:
   experts:
     driver: bridge
     name: hermes-experts
+
+volumes:
+  board-data:
+    external: true
+    name: hermes-experts-data
