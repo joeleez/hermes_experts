@@ -1,33 +1,44 @@
 #!/usr/bin/env bash
-# hh — Hermes 專家系統的唯一入口
+# hh — Hermes 專家系統的唯一入口（單容器，N 個 profile）
 #
 #   ./hh             互動選單
 #   ./hh new         新增專家
 #   ./hh list        列出專家（狀態、在哪個群）
-#   ./hh sync        重新掃描群組
-#   ./hh refresh     套用技能更新（名冊已即時同步，不需這步）
-#   ./hh fix-perms   修正專家目錄權限（agent 讀不到 .env 時用）
 #   ./hh doctor      體檢
-#   ./hh logs <n>    看日誌
+#   ./hh refresh     套用技能／名冊更新（重建容器）
+#   ./hh fix-perms   修正專家目錄權限
+#   ./hh logs [n]    看日誌（可只看某位專家）
 #   ./hh secret_create <n> "<說明>" <KEY_NAME> [值]
 #   ./hh secret_update <n> <KEY_NAME> [值] [--desc "<新說明>"]
 #   ./hh secret_delete <n> <KEY_NAME>
 #   ./hh secret_list   <n>
 #   ./hh approve <n> [配對碼]
-#   ./hh start|stop|restart <n> | restart-all
+#   ./hh start|stop|restart
 #   ./hh rm <n>      移除專家（保留記憶）
 #   ./hh update      拉新版框架並重建
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source scripts/lib/common.sh
 
+C="hermes-experts"   # 唯一的主容器（內含所有 profile）
+
+container_up() { docker ps --format '{{.Names}}' | grep -qx "$C"; }
+profile_exists() { docker exec "$C" test -d "/opt/data/profiles/$1" 2>/dev/null; }
+
+# 把 private/experts 的變更同步到各 profile（.env、SOUL、技能、identity）
+sync_profiles() {
+  container_up || return 0
+  docker exec -u 0 "$C" /etc/cont-init.d/99-seed-profiles >/dev/null 2>&1 || true
+}
+
 cmd_list() {
   need_docker
   local exps; exps="$(list_experts)"
   [ -z "$exps" ] && { warn "還沒有專家（./hh new）"; return 0; }
 
+  local up="否"; container_up && up="是"
+
   # 群組即時查詢：用每位專家自己的憑證問飛書「我在哪些群」
-  # 不落地成檔案，所以「把專家拉進群」之後不需要跑任何指令。
   local gmap; gmap="$(python3 - "$EXPERTS" "$ROOT" <<'PY' 2>/dev/null
 import json, os, sys, urllib.error, urllib.request
 experts_dir, root = sys.argv[1], sys.argv[2]
@@ -71,40 +82,40 @@ for name in sorted(os.listdir(experts_dir)):
 PY
 )"
 
-  printf '\n%s%-12s %-18s %-10s %s%s\n' "$C_B" "代號" "群裡名稱" "容器" "所在群" "$C_0"
+  printf '\n%s%-12s %-18s %-12s %s%s\n' "$C_B" "代號" "群裡名稱" "profile" "所在群" "$C_0"
   hr
   for n in $exps; do
-    local title status groups
+    local title st groups
     title="$(expert_field "$n" title)"
-    if docker ps --format '{{.Names}}' | grep -qx "hermes-$n"; then
-      status="$(docker inspect "hermes-$n" --format '{{.State.Health.Status}}' 2>/dev/null)"
-      [ "$status" = "healthy" ] && status="${C_OK}運行中${C_0}" || status="${C_WARN}$status${C_0}"
+    if [ "$up" = "是" ] && profile_exists "$n"; then
+      st="${C_OK}已載入${C_0}"
+    elif [ "$up" = "是" ]; then
+      st="${C_WARN}未載入${C_0}"
     else
-      status="${C_DIM}已停止${C_0}"
+      st="${C_DIM}容器停${C_0}"
     fi
     groups="$(printf '%s\n' "$gmap" | awk -F'\t' -v k="$n" '$1==k{print $2}')"
-    printf '%-12s %-18s %-10b %s\n' "$n" "$title" "$status" "${groups:-?}"
+    printf '%-12s %-18s %-12b %s\n' "$n" "$title" "$st" "${groups:-?}"
   done
+  printf '\n%s容器：%s（%s）%s\n' "$C_DIM" "$C" "$([ "$up" = "是" ] && echo 運行中 || echo 已停止)" "$C_0"
   printf '\n'
 }
 
 cmd_approve() {
   local name="${1:-}" code="${2:-}"
-  [ -n "$name" ] || { bad "用法：./hh approve <專家> <配對碼>"; return 1; }
-  local c="hermes-$name"
-  docker ps --format '{{.Names}}' | grep -qx "$c" || { bad "$c 未啟動"; return 1; }
+  [ -n "$name" ] || { bad "用法：./hh approve <專家> [配對碼]"; return 1; }
+  container_up || { bad "$C 未啟動（./hh start）"; return 1; }
   if [ -z "$code" ]; then
     dim "$name 目前待批准的請求："
-    docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing list 2>&1 | sed 's/^/    /'
+    docker exec -e HERMES_HOME=/opt/data "$C" hermes -p "$name" pairing list 2>&1 | sed 's/^/    /'
     read -rp "配對碼（專家在飛書給你那個 8 位碼）: " code
   fi
   [ -n "$code" ] || { bad "沒有配對碼"; return 1; }
-  docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing approve feishu "$code" 2>&1 | tail -3
-  docker exec -e HERMES_HOME=/opt/data "$c" hermes pairing list 2>&1 | tail -6
+  docker exec -e HERMES_HOME=/opt/data "$C" hermes -p "$name" pairing approve feishu "$code" 2>&1 | tail -3
+  docker exec -e HERMES_HOME=/opt/data "$C" hermes -p "$name" pairing list 2>&1 | tail -6
 }
 
 cmd_secret_create() {
-  # ./hh secret_create <專家> "<說明>" <KEY_NAME> [值]
   local name="${1:-}" desc="${2:-}" key="${3:-}" val="${4:-}"
   if [ -z "$name" ] || [ -z "$desc" ] || [ -z "$key" ]; then
     bad '用法：./hh secret_create <專家> "<說明>" <KEY_NAME> [值]'
@@ -116,11 +127,10 @@ cmd_secret_create() {
     read -rsp "輸入 $key 的值（不顯示）: " val; echo
     [ -n "$val" ] || { bad "空值，取消"; return 1; }
   fi
-  python3 scripts/secrets.py create "$EXPERTS/$name/.env" "$key" "$desc" "$val"
+  python3 scripts/secrets.py create "$EXPERTS/$name/.env" "$key" "$desc" "$val" && sync_profiles
 }
 
 cmd_secret_update() {
-  # ./hh secret_update <專家> <KEY_NAME> [值] [--desc "<新說明>"]
   local name="${1:-}" key="${2:-}"; shift 2 2>/dev/null || shift $# 2>/dev/null || true
   local val="" desc=""
   while [ $# -gt 0 ]; do
@@ -131,7 +141,6 @@ cmd_secret_update() {
   done
   if [ -z "$name" ] || [ -z "$key" ]; then
     bad '用法：./hh secret_update <專家> <KEY_NAME> [值] [--desc "<新說明>"]'
-    dim '  例：./hh secret_update developer NGB_GIT_TOKEN'
     return 1
   fi
   [ -f "$EXPERTS/$name/.env" ] || { bad "找不到 private/experts/$name/.env"; return 1; }
@@ -139,20 +148,16 @@ cmd_secret_update() {
     read -rsp "輸入 $key 的新值（不顯示）: " val; echo
     [ -n "$val" ] || { bad "空值，取消"; return 1; }
   fi
-  python3 scripts/secrets.py update "$EXPERTS/$name/.env" "$key" "$desc" "$val"
+  python3 scripts/secrets.py update "$EXPERTS/$name/.env" "$key" "$desc" "$val" && sync_profiles
 }
 
 cmd_secret_delete() {
-  # ./hh secret_delete <專家> <KEY_NAME>
   local name="${1:-}" key="${2:-}"
-  if [ -z "$name" ] || [ -z "$key" ]; then
-    bad '用法：./hh secret_delete <專家> <KEY_NAME>'
-    return 1
-  fi
+  [ -n "$name" ] && [ -n "$key" ] || { bad '用法：./hh secret_delete <專家> <KEY_NAME>'; return 1; }
   [ -f "$EXPERTS/$name/.env" ] || { bad "找不到 private/experts/$name/.env"; return 1; }
   read -rp "確定刪除 $name 的 $key？(yes/N) " ans
   [ "$ans" = "yes" ] || { echo "取消"; return 0; }
-  python3 scripts/secrets.py delete "$EXPERTS/$name/.env" "$key"
+  python3 scripts/secrets.py delete "$EXPERTS/$name/.env" "$key" && sync_profiles
 }
 
 cmd_secret_list() {
@@ -164,8 +169,11 @@ cmd_secret_list() {
 
 cmd_logs() {
   local name="${1:-}"
-  [ -n "$name" ] || { bad "用法：./hh logs <專家>"; return 1; }
-  docker logs -f --tail 80 "hermes-$name"
+  if [ -n "$name" ]; then
+    docker logs -f --tail 100 "$C" 2>&1 | grep --line-buffered -i "$name"
+  else
+    docker logs -f --tail 100 "$C"
+  fi
 }
 
 cmd_update() {
@@ -174,10 +182,8 @@ cmd_update() {
   ./scripts/gen-peers.sh
   ./scripts/gen-compose.sh
   docker compose -f "$BASE_COMPOSE" -f "$GEN_COMPOSE" build
-  for n in $(list_experts); do
-    dc up -d --force-recreate "$n"
-  done
-  ok "已更新並重建所有專家"
+  dc up -d --force-recreate
+  ok "已更新並重建 $C（所有 profile 一起重啟）"
 }
 
 menu() {
@@ -193,7 +199,7 @@ menu() {
  5) 看日誌
  6) 管理專家密碼（新增／更新／刪除／列出）
  7) 批核飛書使用者（配對碼）
- 8) 重啟全部
+ 8) 重啟容器（所有專家）
  9) 移除專家
  0) 離開
 TXT
@@ -204,7 +210,7 @@ TXT
       2) cmd_list ;;
       3) ./scripts/refresh.sh ;;
       4) ./scripts/doctor.sh ;;
-      5) read -rp "專家代號: " n; cmd_logs "$n" ;;
+      5) read -rp "專家代號（可留空看全部）: " n; cmd_logs "$n" ;;
       6) read -rp "專家代號: " n
          read -rp "動作（1=新增 2=更新 3=刪除 4=列出）: " act
          case "$act" in
@@ -217,7 +223,7 @@ TXT
            *) warn "沒有這個選項" ;;
          esac ;;
       7) read -rp "專家代號: " n; cmd_approve "$n" ;;
-      8) for n in $(list_experts); do dc up -d --force-recreate "$n" >/dev/null 2>&1 && ok "重啟 $n"; done ;;
+      8) dc restart ;;
       9) read -rp "專家代號: " n; ./scripts/remove-expert.sh "$n" ;;
       0) exit 0 ;;
       *) warn "沒有這個選項" ;;
@@ -231,7 +237,7 @@ case "${1:-}" in
   "")            menu ;;
   new)           ./scripts/add-expert.sh ;;
   list|ls)       cmd_list ;;
-  sync)          cmd_list ;;   # 群組已改為即時查詢，sync 保留為相容別名
+  sync)          cmd_list ;;   # 相容別名（群組為即時查詢）
   refresh)       ./scripts/refresh.sh ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
@@ -239,15 +245,15 @@ case "${1:-}" in
   secret_update) shift; cmd_secret_update "$@" ;;
   secret_delete) shift; cmd_secret_delete "$@" ;;
   secret_list)   cmd_secret_list "${2:-}" ;;
-  fix-perms)     ./scripts/fix-perms.sh ;;
   secret)        bad "./hh secret 已取消，改用 secret_create / secret_update / secret_delete" ;;
   approve)       cmd_approve "${2:-}" "${3:-}" ;;
-  start)         dc up -d "${2:?需要專家代號}" ;;
-  stop)          dc stop "${2:?需要專家代號}" ;;
-  restart)       dc up -d --force-recreate "${2:?需要專家代號}" ;;
-  restart-all)   for n in $(list_experts); do dc up -d --force-recreate "$n" >/dev/null && ok "重啟 $n"; done ;;
+  fix-perms)     ./scripts/fix-perms.sh ;;
+  start)         dc up -d && ok "已啟動 $C" ;;
+  stop)          dc stop && ok "已停止 $C" ;;
+  restart)       dc restart && ok "已重啟 $C" ;;
+  restart-all)   dc restart && ok "已重啟 $C" ;;
   rm)            ./scripts/remove-expert.sh "${2:-}" "${3:-}" ;;
   update)        cmd_update ;;
-  -h|--help|help) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)             bad "未知指令：$1（./hh --help）"; exit 1 ;;
 esac

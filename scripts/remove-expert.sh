@@ -17,18 +17,18 @@ echo "即將處理專家：$NAME"
 read -rp "確定？(yes/N) " ans
 [ "$ans" = "yes" ] || { echo "取消"; exit 0; }
 
-dc stop "$NAME" 2>/dev/null || true
-dc rm -f "$NAME" 2>/dev/null || true
+# 刪掉容器內的 profile（記憶在 volume 裡，profile 目錄也一起移除）
+docker exec hermes-experts hermes profile delete "$NAME" --force >/dev/null 2>&1 || true
 
 if [ "$PURGE" = "1" ]; then
-  docker volume rm "hermes-$NAME-data" 2>/dev/null || true
   rm -rf "${EXPERTS:?}/$NAME"
-  ok "已刪除容器、volume、private/experts/$NAME"
+  ok "已刪除 profile、private/experts/$NAME（記憶一併移除）"
 else
-  ok "已停止容器（記憶保留在 hermes-$NAME-data）"
+  ok "已移除 profile（記憶保留在 hermes-experts-data 內的殘留目錄）"
   dim "  目錄仍在 private/experts/$NAME —— 要移除請加 --purge"
 fi
 
 ./scripts/gen-peers.sh >/dev/null 2>&1 || true
 ./scripts/gen-compose.sh >/dev/null 2>&1 || true
-dim "  名冊與 compose 已重新生成"
+./scripts/refresh.sh >/dev/null 2>&1 || true
+dim "  名冊已重新生成，容器已重建"

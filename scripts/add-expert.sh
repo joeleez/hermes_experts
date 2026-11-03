@@ -163,12 +163,12 @@ fi
 
 if [ "$DO_START" = "1" ]; then
   echo
-  dc up -d "$NAME"
+  dc up -d --force-recreate
   echo
   printf '等待連線'
   for i in $(seq 1 30); do
     sleep 2; printf '.'
-    if docker logs "hermes-$NAME" --since 2m 2>&1 | grep -q "connected to wss://"; then
+    if docker logs hermes-experts --since 2m 2>&1 | grep -q "connected to wss://"; then
       echo; ok "Feishu websocket 已連線"; break
     fi
     [ "$i" = "30" ] && { echo; warn "60 秒內未看到連線，看 ./hh logs $NAME"; }

@@ -1,87 +1,97 @@
 #!/usr/bin/env bash
-# doctor.sh — 逐位專家體檢
+# doctor.sh — 逐位專家體檢（單容器 / N 個 profile）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 need_docker
 
 FAIL=0
+C="hermes-experts"
 EXPS="$(list_experts)"
 
 if [ -z "$EXPS" ]; then
-  warn "還沒有任何專家（./hh new 新增）"
+  warn "還沒有任何專家（./hh new）"
   exit 0
 fi
 
+if docker ps --format '{{.Names}}' | grep -qx "$C"; then
+  st="$(docker inspect "$C" --format '{{.State.Health.Status}}' 2>/dev/null)"
+  [ "$st" = "healthy" ] && ok "容器 $C healthy" || warn "容器 health=$st"
+else
+  bad "容器 $C 未啟動（./hh start）"
+  exit 1
+fi
+
+if docker exec "$C" sh -c "grep -q 'multiplex_profiles: true' /opt/data/config.yaml" 2>/dev/null; then
+  ok "multiplex_profiles=true（一個進程服務所有 profile）"
+else
+  bad "multiplex_profiles 未開啟"
+  FAIL=1
+fi
+
 for name in $EXPS; do
-  c="hermes-$name"
   printf '\n%s%s%s  (%s)\n' "$C_B" "$name" "$C_0" "$(expert_field "$name" title)"
+  P="/opt/data/profiles/$name"
 
-  # 1. 檔案齊全
-  for f in expert.yml SOUL.md .env; do
-    [ -f "$EXPERTS/$name/$f" ] || { bad "缺 private/experts/$name/$f"; FAIL=1; }
-  done
-  [ -f "$EXPERTS/$name/expert.yml" ] && ok "檔案齊全"
-
-  # 2. 容器
-  if docker ps --format '{{.Names}}' | grep -qx "$c"; then
-    st="$(docker inspect "$c" --format '{{.State.Health.Status}}' 2>/dev/null)"
-    [ "$st" = "healthy" ] && ok "container healthy" || warn "container health=$st"
+  if docker exec "$C" test -d "$P" 2>/dev/null; then
+    ok "profile 已建立"
   else
-    bad "container 未啟動（./hh start $name）"; FAIL=1; continue
+    bad "profile 不存在（./hh refresh）"
+    FAIL=1
+    continue
   fi
 
-  # 3. 連線
-  if docker logs "$c" --since 30m 2>&1 | grep -q "connected to wss://"; then
-    ok "Feishu websocket 已連線"
+  pid="$(docker exec "$C" sh -c "grep -h '^FEISHU_APP_ID=' $P/.env 2>/dev/null | cut -d= -f2" || true)"
+  if [ -n "$pid" ]; then
+    ok "專屬 Feishu App（${pid:0:12}…）"
   else
-    warn "最近 30 分鐘無連線紀錄（可能只是沒重啟）"
+    bad "缺 FEISHU_APP_ID"
+    FAIL=1
   fi
 
-  # 4. 身份
-  ident="$(docker exec "$c" cat /opt/data/identity.yaml 2>/dev/null)"
-  if [ -n "$ident" ]; then
-    printf '%s' "$ident" | grep -q '^role: expert' && ok "identity role=expert" || { bad "identity role 不對"; FAIL=1; }
-    printf '%s' "$ident" | grep -q '^title: ' && ok "identity 有 title" || { bad "identity 缺 title"; FAIL=1; }
-  else
-    bad "缺 /opt/data/identity.yaml"; FAIL=1
-  fi
+  rm_val="$(docker exec "$C" sh -c "grep -h '^FEISHU_REQUIRE_MENTION=' $P/.env | cut -d= -f2" || true)"
+  [ "$rm_val" = "true" ] && ok "require_mention=true（只被 @ 才回應）" || { bad "require_mention=$rm_val"; FAIL=1; }
 
-  # 5. 技能
-  docker exec "$c" test -d /opt/data/skills/group-protocol 2>/dev/null \
+  ab="$(docker exec "$C" sh -c "grep -h '^FEISHU_ALLOW_BOTS=' $P/.env | cut -d= -f2" || true)"
+  [ "$ab" = "none" ] && ok "allow_bots=none" || warn "allow_bots=${ab:-未設定}"
+
+  docker exec "$C" test -d "$P/skills/group-protocol" 2>/dev/null \
     && ok "共用知識 group-protocol" || { bad "缺 group-protocol"; FAIL=1; }
-  docker exec "$c" test -d /opt/data/skills/expert-self 2>/dev/null \
+  docker exec "$C" test -d "$P/skills/expert-self" 2>/dev/null \
     && ok "共用知識 expert-self" || { bad "缺 expert-self"; FAIL=1; }
 
-  # 6. 准入設定
-  rm_val="$(docker exec "$c" sh -c "grep -h '^FEISHU_REQUIRE_MENTION=' /opt/data/.env | cut -d= -f2" 2>/dev/null)"
-  [ "$rm_val" = "true" ] && ok "require_mention=true（只被 @ 才回應）" || { bad "require_mention=$rm_val（應為 true）"; FAIL=1; }
-  ab="$(docker exec "$c" sh -c "grep -h '^FEISHU_ALLOW_BOTS=' /opt/data/.env | cut -d= -f2" 2>/dev/null)"
-  [ "$ab" = "none" ] && ok "allow_bots=none（不理其他 bot）" || warn "allow_bots=${ab:-未設定}"
-
-  # 7. 憑證
-  docker exec "$c" sh -c "grep -q '^FEISHU_APP_ID=cli_' /opt/data/.env" 2>/dev/null \
-    && ok "App ID 已設定" || { bad "缺 App ID"; FAIL=1; }
-
-  # 7.5 專家目錄權限（容器 uid 10000 要能讀 .env、寫 expert.yml）
-  if docker exec -u hermes "$c" sh -c "test -r /opt/bootstrap/expert/.env" 2>/dev/null; then
-    ok "agent 可讀 secrets（/opt/bootstrap/expert/.env）"
+  if docker exec "$C" test -f "$P/identity.yaml" 2>/dev/null; then
+    docker exec "$C" sh -c "grep -q '^role: expert' $P/identity.yaml" \
+      && ok "identity role=expert" || { bad "identity 缺 role"; FAIL=1; }
   else
-    bad "agent 讀不到 .env（跑 ./hh fix-perms）"; FAIL=1
+    bad "缺 identity.yaml"
+    FAIL=1
   fi
-  if docker exec -u hermes "$c" sh -c "test -w /opt/bootstrap/expert/expert.yml" 2>/dev/null; then
+
+  docker exec "$C" test -f "$P/SOUL.md" 2>/dev/null && ok "SOUL.md（人格）" || { bad "缺 SOUL.md"; FAIL=1; }
+
+  n="$(docker exec "$C" sh -c "awk '/^- name:/{n++} END{print (n>0?n-1:0)}' /opt/data/peers.yaml" 2>/dev/null)"
+  ok "peers.yaml（其他專家 ${n:-?} 位）"
+
+  if docker exec -u hermes "$C" sh -c "test -r /opt/bootstrap/experts/$name/.env" 2>/dev/null; then
+    ok "agent 可讀 secrets"
+  else
+    bad "agent 讀不到 secrets（./hh fix-perms）"
+    FAIL=1
+  fi
+  if docker exec -u hermes "$C" sh -c "test -w /opt/bootstrap/experts/$name/expert.yml" 2>/dev/null; then
     ok "agent 可寫自己的 expert.yml"
   else
-    warn "agent 不能寫 expert.yml（職責無法自我更新；跑 ./hh fix-perms）"
-  fi
-
-  # 8. 名冊（peers.yaml 含自己，所以要扣掉）
-  if docker exec "$c" test -f /opt/data/peers.yaml 2>/dev/null; then
-    n="$(docker exec "$c" sh -c "awk '/^- name:/{n++} END{print (n>0?n-1:0)}' /opt/data/peers.yaml" 2>/dev/null)"
-    ok "peers.yaml（其他專家 $n 位）"
-  else
-    warn "缺 peers.yaml（只影響「認識其他專家」）"
+    warn "agent 不能寫 expert.yml（職責無法自我更新；./hh fix-perms）"
   fi
 done
+
+echo
+n_conn="$(docker logs "$C" --since 60m 2>&1 | grep -c "connected to wss://" || true)"
+if [ "${n_conn:-0}" -gt 0 ]; then
+  ok "飛書 WebSocket 連線紀錄 $n_conn 次（最近 60 分鐘）"
+else
+  warn "最近 60 分鐘沒有連線紀錄（可能只是沒重啟）"
+fi
 
 printf '\n'
 [ "$FAIL" -eq 0 ] && printf '%s全部通過%s\n' "$C_OK" "$C_0" || printf '%s有項目未通過%s\n' "$C_BAD" "$C_0"
