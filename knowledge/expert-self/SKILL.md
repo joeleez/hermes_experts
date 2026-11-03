@@ -4,12 +4,26 @@
 
 | 路徑 | 內容 | 誰寫 |
 |---|---|---|
-| `/opt/data/` | 你的記憶、session、`.env`、`identity.yaml` | 系統 |
-| `/opt/data/skills/` | 你現在會用的技能 | 系統 + 你 |
-| `/opt/bootstrap/expert/` | **你的持久化身份**（`expert.yml`、`SOUL.md`、`skills/`） | 你 |
+| `/opt/bootstrap/experts/<你的代號>/` | **你的持久化身份**：`expert.yml`、`SOUL.md`、`skills/`、`.env` | 你（宿主機的 `private/experts/<代號>/`） |
+| `/opt/data/profiles/<你的代號>/` | **你的執行環境**：`identity.yaml`、`memories/`、`sessions/`、`skills/`、`state.db` | 系統 |
+| `/opt/data/peers.yaml` | 所有專家的名稱、簡介、專長（共用、即時） | 系統 |
+| `/opt/data/groups.yaml` | 每個群有哪些專家（共用、每 60 秒更新） | 系統 |
 
-`/opt/bootstrap/expert/` 是你唯一「寫了會留下來」的地方 —— 它對應到宿主機的
-`private/experts/<你的名字>/`。容器重建、升級映像，這裡的檔案都不會消失。
+`/opt/bootstrap/experts/<你的代號>/` 是你唯一「寫了會留下來」的地方 ——
+它對應到宿主機的 `private/experts/<代號>/`。容器重建、升級映像，這裡的檔案都不會消失。
+
+代號就是你的 `identity.yaml` 裡的 `agent:` 值（例如 `developer`）。
+
+### 你和其他專家共用一個進程
+
+所有專家跑在**同一個容器、同一個 gateway 進程**裡（Hermes 的 profile 機制）。
+所以：
+
+| 可以 | 不可以 |
+|---|---|
+| 讀 `/opt/data/peers.yaml` 知道別人是誰 | 讀 `/opt/data/profiles/<別人的代號>/` 的記憶或技能 |
+| 改自己的 `expert.yml` | 改別人的目錄 |
+| 請人類跑 `./hh refresh` | 自己重啟容器 —— 那會讓**所有專家**一起中斷 |
 
 ## 當人類告訴你「你負責什麼」
 
@@ -17,7 +31,7 @@
 這時你要**寫進 `expert.yml`**，否則只有你記得，其他專家永遠不知道。
 
 ```yaml
-# /opt/bootstrap/expert/expert.yml
+# /opt/bootstrap/experts/<你的代號>/expert.yml
 name: mpf
 title: MPF專家
 summary: 強積金對帳、供款與收益核對          ← 改這裡
@@ -49,13 +63,14 @@ updated_at: "2026-10-30"
 把它變成技能檔，**同時寫兩份**：
 
 ```bash
-mkdir -p /opt/bootstrap/expert/skills/<主題>
-# 寫 /opt/bootstrap/expert/skills/<主題>/SKILL.md
-cp -r /opt/bootstrap/expert/skills/<主題> /opt/data/skills/<主題>
+D=/opt/bootstrap/experts/<你的代號>
+mkdir -p "$D/skills/<主題>"
+# 寫 $D/skills/<主題>/SKILL.md
+cp -r "$D/skills/<主題>" "/opt/data/profiles/<你的代號>/skills/<主題>"
 ```
 
-- `/opt/bootstrap/expert/skills/` → 永久保存（宿主機可見）
-- `/opt/data/skills/` → 你這次執行立刻可用
+- `/opt/bootstrap/experts/<代號>/skills/` → 永久保存（宿主機可見）
+- `/opt/data/profiles/<代號>/skills/` → 你這次執行立刻可用
 
 `SKILL.md` 開頭要有 frontmatter：
 
@@ -118,10 +133,10 @@ description: Use when 對帳 MPF 供款與收益。驗算總額 = 供款 + 收�
 
 ### 你怎麼讀
 
-寫入後在 `/opt/bootstrap/expert/.env`，你這樣取：
+寫入後在 `/opt/bootstrap/experts/<你的代號>/.env`，你這樣取：
 
 ```bash
-grep '^NGB_GIT_TOKEN=' /opt/bootstrap/expert/.env | cut -d= -f2-
+grep '^NGB_GIT_TOKEN=' /opt/bootstrap/experts/<你的代號>/.env | cut -d= -f2-
 ```
 
 若真的遇到 `Permission denied`：**不要叫人類 sudo chmod，也不要建議改寫到
@@ -212,8 +227,10 @@ Lark 開發者後台（open.larksuite.com/app）首頁有一張卡片
 **講到這一步時，把這張圖一起附上**（在回覆裡單獨一行寫）：
 
 ```
-MEDIA:/opt/data/skills/expert-self/assets/lark-create-agent-app.jpg
+MEDIA:/opt/data/profiles/<你的代號>/skills/expert-self/assets/lark-create-agent-app.jpg
 ```
+
+（把 `<你的代號>` 換成你 `identity.yaml` 裡的 `agent:` 值。）
 
 圖上箭頭指的就是那顆「立即創建」按鈕。附圖後用一句話說明：
 「首頁這張卡片的紫色按鈕就是入口」。
@@ -264,4 +281,4 @@ MEDIA:/opt/data/skills/expert-self/assets/lark-create-agent-app.jpg
 | 改 `name` 欄位 | 它是目錄名與容器名，改了會對不上 |
 | 自己建立／複製專家容器 | 你沒有 Docker 權限；只能說明步驟給人類 |
 
-需要密碼時：用上面那條 `./hh secret` 命令，之後讀 `/opt/bootstrap/expert/.env`。
+需要密碼時：用上面那條 `./hh secret_create` 命令，之後讀 `/opt/bootstrap/experts/<你的代號>/.env`。
