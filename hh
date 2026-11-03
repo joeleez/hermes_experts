@@ -15,6 +15,7 @@
 #   ./hh approve <n> [配對碼]
 #   ./hh start|stop|restart
 #   ./hh rm <n>      移除專家（保留記憶）
+#   ./hh schedule [HH:MM|off]  設定每日定時重啟
 #   ./hh update      拉新版框架並重建
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -225,6 +226,8 @@ TXT
       7) read -rp "專家代號: " n; cmd_approve "$n" ;;
       8) dc restart ;;
       9) read -rp "專家代號: " n; ./scripts/remove-expert.sh "$n" ;;
+      10) read -rp "每日重啟時間（HH:MM，留空=取消）: " tm
+          if [ -z "$tm" ]; then ./scripts/schedule.sh off; else ./scripts/schedule.sh "$tm"; fi ;;
       0) exit 0 ;;
       *) warn "沒有這個選項" ;;
     esac
@@ -253,6 +256,7 @@ case "${1:-}" in
   restart)       dc restart && ok "已重啟 $C" ;;
   restart-all)   dc restart && ok "已重啟 $C" ;;
   rm)            ./scripts/remove-expert.sh "${2:-}" "${3:-}" ;;
+  schedule)      ./scripts/schedule.sh "${2:-}" ;;
   update)        cmd_update ;;
   -h|--help|help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)             bad "未知指令：$1（./hh --help）"; exit 1 ;;

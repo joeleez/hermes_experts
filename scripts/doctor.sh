@@ -59,6 +59,15 @@ for name in $EXPS; do
   docker exec "$C" test -d "$P/skills/expert-self" 2>/dev/null \
     && ok "共用知識 expert-self" || { bad "缺 expert-self"; FAIL=1; }
 
+  # 共用知識副本是否與來源一致（不一致＝過期或有專家動過）
+  local drift=0
+  for kdir in group-protocol expert-self; do
+    src="$(docker exec "$C" sh -c "md5sum /opt/bootstrap/knowledge/$kdir/SKILL.md 2>/dev/null | cut -d' ' -f1")"
+    dst="$(docker exec "$C" sh -c "md5sum $P/skills/$kdir/SKILL.md 2>/dev/null | cut -d' ' -f1")"
+    [ -n "$src" ] && [ "$src" != "$dst" ] && drift=1
+  done
+  [ "$drift" = "0" ] && ok "共用知識與來源一致" || warn "共用知識與來源不同（./hh refresh 可同步）"
+
   if docker exec "$C" test -f "$P/identity.yaml" 2>/dev/null; then
     docker exec "$C" sh -c "grep -q '^role: expert' $P/identity.yaml" \
       && ok "identity role=expert" || { bad "identity 缺 role"; FAIL=1; }
