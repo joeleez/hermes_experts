@@ -60,7 +60,7 @@ for name in $EXPS; do
     && ok "共用知識 expert-self" || { bad "缺 expert-self"; FAIL=1; }
 
   # 共用知識副本是否與來源一致（不一致＝過期或有專家動過）
-  local drift=0
+  drift=0
   for kdir in group-protocol expert-self; do
     src="$(docker exec "$C" sh -c "md5sum /opt/bootstrap/knowledge/$kdir/SKILL.md 2>/dev/null | cut -d' ' -f1")"
     dst="$(docker exec "$C" sh -c "md5sum $P/skills/$kdir/SKILL.md 2>/dev/null | cut -d' ' -f1")"
