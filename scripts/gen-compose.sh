@@ -14,6 +14,7 @@ mkdir -p "$EXPERTS"
 # bind-mount 的來源檔若不存在，docker 會建成目錄 → 先確保存在
 [ -f "$PEERS" ] || printf '# 尚無專家\n' > "$PEERS"
 [ -f "$GROUPS" ] || printf '# 尚未生成（roster 服務啟動後會寫入）\n' > "$GROUPS"
+mkdir -p "$ROOT/projects"
 
 python3 - "$GEN_COMPOSE" <<'PY'
 import sys
@@ -40,6 +41,8 @@ experts = {
         "./private/experts:/opt/bootstrap/experts",
         "./private/peers.yaml:/opt/data/peers.yaml",
         "./private/groups.yaml:/opt/data/groups.yaml:ro",
+        # 專案資料夾：每個專案的產出檔（CSV、報告）都在這裡
+        "./projects:/opt/data/projects",
     ],
     "networks": ["experts"],
     "stop_grace_period": "30s",

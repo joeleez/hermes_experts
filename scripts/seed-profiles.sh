@@ -106,16 +106,24 @@ for d in "$SRC"/*/; do
   # 1c. config.yaml（模型可被 expert.yml 的 model: 覆蓋）
   MODEL="$(awk '/^model:/{print $2}' "${d}expert.yml" 2>/dev/null || true)"
   MODEL="${MODEL:-${HERMES_MODEL:-}}"
-  cat > "$P/config.yaml" <<YAML
-# 由 seed-profiles.sh 產生
-model:
-  default: "${MODEL}"
+  # 供應商與端點：aimlapi 這類 OpenAI 相容服務要用 provider + base_url
+  PROVIDER_VAL="${HERMES_PROVIDER:-}"
+  BASE_VAL="${HERMES_BASE_URL:-}"
+  {
+    echo "# 由 seed-profiles.sh 產生"
+    echo "model:"
+    echo "  default: \"${MODEL}\""
+    [ -n "$PROVIDER_VAL" ] && echo "  provider: ${PROVIDER_VAL}"
+    [ -n "$BASE_VAL" ] && echo "  base_url: ${BASE_VAL}"
+    [ -n "${HERMES_API_MODE:-}" ] && echo "  api_mode: ${HERMES_API_MODE}"
+    cat <<YAML
 
 memory:
   memory_enabled: true
   user_profile_enabled: true
   memory_char_limit: 2200
 YAML
+  } > "$P/config.yaml"
 
   # 1d. 首次：SOUL.md（之後保留專家自己改的版本）
   if [ ! -f "$MARKER" ]; then

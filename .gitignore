@@ -16,3 +16,5 @@ data/
 .DS_Store
 Thumbs.db
 private/groups.yaml
+projects/*
+!projects/.gitkeep
