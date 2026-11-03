@@ -5,7 +5,7 @@
 #   ./hh new         新增專家
 #   ./hh list        列出專家（狀態、在哪個群）
 #   ./hh doctor      體檢
-#   ./hh refresh     套用技能／名冊更新（重建容器）
+#   ./hh refresh [--now|--later]  套用變更（會問你立即或排到定時）
 #   ./hh fix-perms   修正專家目錄權限
 #   ./hh logs [n]    看日誌（可只看某位專家）
 #   ./hh secret_create <n> "<說明>" <KEY_NAME> [值]
@@ -241,7 +241,7 @@ case "${1:-}" in
   new)           ./scripts/add-expert.sh ;;
   list|ls)       cmd_list ;;
   sync)          cmd_list ;;   # 相容別名（群組為即時查詢）
-  refresh)       ./scripts/refresh.sh ;;
+  refresh)       shift; ./scripts/refresh.sh "${1:-}" ;;
   doctor)        ./scripts/doctor.sh ;;
   logs)          cmd_logs "${2:-}" ;;
   secret_create) shift; cmd_secret_create "$@" ;;
