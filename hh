@@ -16,6 +16,7 @@
 #   ./hh start|stop|restart
 #   ./hh rm <n>      移除專家（保留記憶）
 #   ./hh schedule [HH:MM|off]  設定每日定時重啟
+#   ./hh admin       後台管理員是否在運作（心跳）
 #   ./hh update      拉新版框架並重建
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -236,6 +237,51 @@ TXT
   done
 }
 
+
+# ── 後台管理員（建立這套系統的 agent）存活狀態 ───────────────
+HB="$ROOT/private/.admin-heartbeat"
+cmd_admin() {
+  if [ "${1:-}" = "beat" ]; then
+    mkdir -p "$(dirname "$HB")"
+    local _note="${2:-}"
+    # 沒帶說明時沿用上一次的說明（排程心跳不會蓋掉真正的工作紀錄）
+    if [ -z "$_note" ] && [ -f "$HB" ]; then _note=$(sed -n 2p "$HB"); fi
+    { date +%s; printf '%s\n' "$_note"; } > "$HB"
+    ok "心跳已更新"
+    return 0
+  fi
+  local now ts age note
+  now=$(date +%s)
+  printf '\n%s\n' "後台管理員（Hermes · WSL 那側）"
+  if [ ! -f "$HB" ]; then
+    warn "沒有心跳紀錄 —— 可能從未啟動，或心跳排程沒跑"
+    printf '  %s\n' "（./hh admin beat 可手動打一次）"
+    return 0
+  fi
+  ts=$(sed -n 1p "$HB" | tr -dc '0-9')
+  note=$(sed -n 2p "$HB")
+  [ -n "$ts" ] || { warn "心跳檔格式不對：$HB"; return 0; }
+  age=$(( now - ts ))
+  printf '  最後心跳：%s（%s）\n' "$(date -d "@$ts" '+%Y-%m-%d %H:%M')" "$(human_age "$age")"
+  if [ "$age" -lt 600 ]; then
+    printf '  狀態：%s\n' "運作中"
+  elif [ "$age" -lt 3600 ]; then
+    printf '  狀態：%s\n' "閒置（沒有進行中的工作）"
+  else
+    printf '  狀態：%s\n' "未運作（超過一小時沒有心跳）"
+  fi
+  [ -n "$note" ] && printf '  上次工作：%s\n' "$note"
+  printf '\n'
+}
+
+human_age() {
+  local s=$1
+  if [ "$s" -lt 90 ]; then printf '剛剛'
+  elif [ "$s" -lt 5400 ]; then printf '%d 分鐘前' $(( s / 60 ))
+  elif [ "$s" -lt 172800 ]; then printf '%d 小時前' $(( s / 3600 ))
+  else printf '%d 天前' $(( s / 86400 )); fi
+}
+
 case "${1:-}" in
   "")            menu ;;
   new)           ./scripts/add-expert.sh ;;
@@ -257,6 +303,7 @@ case "${1:-}" in
   restart-all)   dc restart && ok "已重啟 $C" ;;
   rm)            ./scripts/remove-expert.sh "${2:-}" "${3:-}" ;;
   schedule)      ./scripts/schedule.sh "${2:-}" ;;
+  admin)         shift; cmd_admin "${1:-}" "${2:-}" ;;
   update)        cmd_update ;;
   -h|--help|help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//' ;;
   *)             bad "未知指令：$1（./hh --help）"; exit 1 ;;
