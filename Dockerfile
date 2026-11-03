@@ -5,7 +5,7 @@
 #
 # 為什麼要裝 pyyaml：seed-agent.sh 用它讀 expert.yml / 寫 identity.yaml，
 # 而 stable 映像的 .venv 沒有 pip，也沒有 pyyaml（2026-10 版實測）。
-FROM nousresearch/hermes-agent:stable
+FROM nousresearch/hermes-agent:latest
 
 RUN /opt/hermes/.venv/bin/python -m ensurepip --upgrade \
  && /opt/hermes/.venv/bin/python -m pip install --no-cache-dir lark-oapi pyyaml \
