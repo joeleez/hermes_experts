@@ -305,6 +305,30 @@ cmd_board() {
   fi
 }
 
+
+# ── 重啟（掛載失效會自動修）────────────────────
+# 為什麼不用 docker restart：bind mount 的來源檔若被replace（inode 變），
+# docker restart 會失敗 "no such file or directory"，容器就永遠起不來。
+# 改用 compose --force-recreate，會重建掛載。
+cmd_restart() {
+  need_docker
+  if ! dc up -d --force-recreate 2>&1 | tail -3; then
+    bad "重建失敗，看：docker logs $C --tail 40"
+    return 1
+  fi
+  local i
+  for i in $(seq 1 30); do
+    sleep 2
+    if container_up && [ "$(docker inspect -f '{{.State.Health.Status}}' "$C" 2>/dev/null)" = "healthy" ]; then
+      ok "已重啟 $C（healthy）"
+      return 0
+    fi
+  done
+  bad "$C 起了但未 healthy"
+  docker logs "$C" --tail 20 2>&1 | tail -10
+  return 1
+}
+
 case "${1:-}" in
   "")            menu ;;
   new)           ./scripts/add-expert.sh ;;
@@ -322,8 +346,8 @@ case "${1:-}" in
   fix-perms)     ./scripts/fix-perms.sh ;;
   start)         dc up -d && ok "已啟動 $C" ;;
   stop)          dc stop && ok "已停止 $C" ;;
-  restart)       dc restart && ok "已重啟 $C" ;;
-  restart-all)   dc restart && ok "已重啟 $C" ;;
+  restart)       cmd_restart ;;
+  restart-all)   cmd_restart ;;
   rm)            ./scripts/remove-expert.sh "${2:-}" "${3:-}" ;;
   schedule)      ./scripts/schedule.sh "${2:-}" ;;
   board|boards)  shift; cmd_board "${1:-}" ;;
